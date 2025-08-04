@@ -82,6 +82,13 @@
     </div>
 
     <script>
+        const keys = {
+            ArrowLeft: { pressed: false, delay: 0 },
+            ArrowRight: { pressed: false, delay: 0 }
+        };
+
+        const keyRepeatDelay = 150; // ミリ秒間隔（調整可）
+
         const canvas = document.getElementById('tetris');
         const ctx = canvas.getContext('2d');
         const nextCanvas = document.getElementById('next');
@@ -97,7 +104,17 @@
         nextCtx.scale(20, 20);
         holdCtx.scale(20, 20);
 
-        const colors = [null, '#FF0D72', '#0DC2FF', '#0DFF72', '#F538FF', '#FF8E0D', '#FFE138', '#3877FF'];
+        const colors = [
+            null,         // 0: 空白
+            '#8000FF',    // 1: T
+            '#FFFF00',    // 2: O
+            '#FFA500',    // 3: L
+            '#0000FF',    // 4: J
+            '#00FFFF',    // 5: I
+            '#00FF00',    // 6: S
+            '#FF0000'     // 7: Z
+        ];
+
         const pieces = 'TJLOSZI';
 
         // 10列×20行
@@ -129,14 +146,15 @@
         }
 
         function createPiece(type) {
-            if (type === 'T') return [[0, 1, 0], [1, 1, 1]];
-            if (type === 'O') return [[2, 2], [2, 2]];
-            if (type === 'L') return [[0, 0, 3], [3, 3, 3]];
-            if (type === 'J') return [[4, 0, 0], [4, 4, 4]];
             if (type === 'I') return [[0, 0, 0, 0], [5, 5, 5, 5]];
+            if (type === 'J') return [[4, 0, 0], [4, 4, 4]];
+            if (type === 'L') return [[0, 0, 3], [3, 3, 3]];
+            if (type === 'O') return [[2, 2], [2, 2]];
             if (type === 'S') return [[0, 6, 6], [6, 6, 0]];
-            if (type === 'Z') return [[7, 7, 0], [0, 7, 7]];
+            if (type === 'T') return [[0, 7, 0], [7, 7, 7]];
+            if (type === 'Z') return [[1, 1, 0], [0, 1, 1]];
         }
+
 
         function drawMatrix(m, offset) {
             m.forEach((row, y) => {
@@ -168,13 +186,27 @@
         }
 
         function draw() {
-            // 黒背景でリセット
             ctx.fillStyle = '#000';
-            ctx.fillRect(0, 0, canvas.width / 20, canvas.height / 20);
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            drawGrid();
+            drawGrid(); // ← マス目があるならこれも
+
             drawMatrix(arena, { x: 0, y: 0 });
+            drawGhost(); // ゴーストミノを表示
             drawMatrix(player.matrix, player.pos);
+        }
+        function drawGhost() {
+            const ghostPos = { x: player.pos.x, y: player.pos.y };
+
+            // ゴーストを下まで落とす
+            while (!collide(arena, { ...player, pos: ghostPos })) {
+                ghostPos.y++;
+            }
+            ghostPos.y--; // 一つ戻す（衝突する直前の位置）
+
+            ctx.globalAlpha = 0.3; // 半透明
+            drawMatrix(player.matrix, ghostPos);
+            ctx.globalAlpha = 1.0; // 不透明に戻す
         }
 
         function merge(arena, player) {
@@ -435,30 +467,79 @@
             draw();
             requestAnimationFrame(update);
         }
-
-        // キーボード操作
-        document.addEventListener('keydown', event => {
-            if (event.repeat) return;
-
-            if (event.key === 'ArrowLeft') {
-                playerMove(-1);
-            } else if (event.key === 'ArrowRight') {
-                playerMove(1);
-            } else if (event.key === 'ArrowDown') {
+        function hardDrop() {
+            while (!collide(arena, player)) {
+                player.pos.y++;
+            }
+            player.pos.y--; // 1マス上に戻る（衝突前の位置）
+            merge(arena, player);
+            arenaSweep();
+            playerReset();
+            dropCounter = 0;
+            player.canHold = true;
+            player.lastMove = 'hardDrop';
+        }
+        document.addEventListener('keydown', e => {
+            if (e.code === 'ArrowLeft') {
+                if (!keys.ArrowLeft.pressed) {
+                    playerMove(-1); // 即時1マス移動
+                }
+                keys.ArrowLeft.pressed = true;
+            } else if (e.code === 'ArrowRight') {
+                if (!keys.ArrowRight.pressed) {
+                    playerMove(1); // 即時1マス移動
+                }
+                keys.ArrowRight.pressed = true;
+            } else if (e.code === 'ArrowDown') {
                 playerDrop();
-            } else if (event.key === 'ArrowUp') {
+            } else if (e.code === 'KeyC') {
                 playerRotate(1);
-            } else if (event.key.toLowerCase() === 'z') {
-                playerRotate(-1);
-            } else if (event.key.toLowerCase() === 'x') {
+            } else if (e.code === 'KeyX') {
                 holdPiece();
+            } else if (e.code === 'ArrowUp') {
+                hardDrop();
             }
         });
+
+        document.addEventListener('keyup', e => {
+            if (e.code in keys) {
+                keys[e.code].pressed = false;
+                keys[e.code].delay = 0;
+            }
+        });
+
+
+
+
 
         // 初期化
         createNextQueue();
         playerReset();
-        update();
+        update(); function update(time = 0) {
+            const delta = time - lastTime;
+            lastTime = time;
+            dropCounter += delta;
+
+            // ←→の自動移動処理
+            for (const key in keys) {
+                if (keys[key].pressed) {
+                    keys[key].delay += delta;
+                    if (keys[key].delay > keyRepeatDelay) {
+                        keys[key].delay = 0;
+                        if (key === 'ArrowLeft') playerMove(-1);
+                        if (key === 'ArrowRight') playerMove(1);
+                    }
+                }
+            }
+
+            if (dropCounter > dropInterval) {
+                playerDrop();
+            }
+
+            draw();
+            requestAnimationFrame(update);
+        }
+
     </script>
 </body>
 
