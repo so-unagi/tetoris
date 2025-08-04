@@ -2,9 +2,10 @@ const keys = {
   ArrowLeft: { pressed: false, delay: 0 },
   ArrowRight: { pressed: false, delay: 0 }
 };
-
-const keyRepeatDelay = 150; // ミリ秒間隔（調整可）
-
+let lockDelay = 300;
+let lockTimer = 0;
+let isLocking = false;
+const keyRepeatDelay = 150;
 const canvas = document.getElementById('tetris');
 const ctx = canvas.getContext('2d');
 const nextCanvas = document.getElementById('next');
@@ -14,8 +15,6 @@ const holdCtx = holdCanvas.getContext('2d');
 
 const scoreEl = document.getElementById('score');
 const highEl = document.getElementById('highscore');
-
-// スケールは20pxで1セル
 ctx.scale(20, 20);
 nextCtx.scale(20, 20);
 holdCtx.scale(20, 20);
@@ -31,9 +30,7 @@ const colors = [
   '#F00000'        // 7: Z (赤)
 ];
 
-const pieces = 'TOLJISZ'; // ピースの種類
-
-// 10列×20行
+const pieces = 'TOLJISZ';
 const arena = createMatrix(10, 20);
 
 const player = {
@@ -47,7 +44,6 @@ const player = {
   canHold: true
 };
 
-// NEXTキュー 5つ
 const NEXT_COUNT = 5;
 const nextQueue = [];
 function initNextQueue() {
@@ -61,7 +57,6 @@ function refillNextQueue() {
   }
 }
 
-// ハイスコア取得
 let highscore = parseInt(localStorage.getItem('tetrisHigh') || '0');
 highEl.textContent = highscore;
 
@@ -93,7 +88,6 @@ function drawMatrix(m, offset) {
   });
 }
 
-// 盤面マス目を描画
 function drawGrid() {
   ctx.strokeStyle = '#777'; // グレー線
   ctx.lineWidth = 0.05;
@@ -115,24 +109,24 @@ function draw() {
   ctx.fillStyle = '#000';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  drawGrid(); // ← マス目があるならこれも
+  drawGrid();
 
   drawMatrix(arena, { x: 0, y: 0 });
-  drawGhost(); // ゴーストミノを表示
+  drawGhost();
   drawMatrix(player.matrix, player.pos);
 }
 function drawGhost() {
   const ghostPos = { x: player.pos.x, y: player.pos.y };
 
-  // ゴーストを下まで落とす
+
   while (!collide(arena, { ...player, pos: ghostPos })) {
     ghostPos.y++;
   }
-  ghostPos.y--; // 一つ戻す（衝突する直前の位置）
+  ghostPos.y--;
 
-  ctx.globalAlpha = 0.3; // 半透明
+  ctx.globalAlpha = 0.3;
   drawMatrix(player.matrix, ghostPos);
-  ctx.globalAlpha = 1.0; // 不透明に戻す
+  ctx.globalAlpha = 1.0;
 }
 
 function merge(arena, player) {
@@ -187,18 +181,24 @@ function playerDrop() {
   player.pos.y++;
   if (collide(arena, player)) {
     player.pos.y--;
-    merge(arena, player);
-    arenaSweep();
-    playerReset();
-    player.canHold = true;
+
+    if (!isLocking) {
+      isLocking = true;
+      lockTimer = 0;
+    }
+  } else {
+    isLocking = false;
   }
+
   dropCounter = 0;
   player.lastMove = 'drop';
 }
 
+
 function playerMove(dir) {
   player.pos.x += dir;
   if (collide(arena, player)) player.pos.x -= dir;
+  isLocking = false;
   player.lastMove = 'move';
 }
 
@@ -240,7 +240,7 @@ function playerRotate(dir) {
   const newRotation = (oldRotation + dir + 4) % 4;
   const kicks = getKickTable(player.type, oldRotation, newRotation);
 
-  const originalMatrix = JSON.parse(JSON.stringify(player.matrix)); // 深いコピー
+  const originalMatrix = JSON.parse(JSON.stringify(player.matrix));
 
   rotate(player.matrix, dir);
 
@@ -256,13 +256,13 @@ function playerRotate(dir) {
     player.pos.x -= dx;
     player.pos.y -= dy;
   }
-
-  player.matrix = originalMatrix; // 回転失敗時に復元
+  isLocking = false;
+  player.matrix = originalMatrix;
 }
 let bag = [];
 function refillBag() {
   const types = ['T', 'J', 'L', 'O', 'S', 'Z', 'I'];
-  // Fisher–Yates シャッフル
+
   for (let i = types.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [types[i], types[j]] = [types[j], types[i]];
@@ -277,8 +277,8 @@ function getNextPieceFromBag() {
 }
 
 function playerReset() {
-  const pieceType = nextQueue.shift();  // 先頭を使う
-  refillNextQueue();                    // 末尾に補充
+  const pieceType = nextQueue.shift();
+  refillNextQueue();
 
   player.matrix = createPiece(pieceType);
   player.type = pieceType;
@@ -287,19 +287,19 @@ function playerReset() {
   player.pos.x = Math.floor(arena[0].length / 2) - Math.floor(player.matrix[0].length / 2);
 
   if (collide(arena, player)) {
-    // ゲームオーバー処理
+
     arena.forEach(row => row.fill(0));
     alert('ゲームオーバー');
     player.score = 0;
     scoreEl.textContent = 0;
-    initNextQueue();  // 初期化時も必要
+    initNextQueue();
     playerReset();
   }
   drawNext();
   drawHold();
 }
 
-// NEXTキュー作成
+
 function createNextQueue() {
   nextQueue.length = 0;
   for (let i = 0; i < NEXT_COUNT; i++) {
@@ -311,13 +311,13 @@ function randomPiece() {
   return pieces[Math.floor(Math.random() * pieces.length)];
 }
 
-// NEXT描画
+
 function drawNext() {
   nextCtx.clearRect(0, 0, nextCanvas.width, nextCanvas.height);
   nextQueue.forEach((type, index) => {
     const matrix = createPiece(type);
     const colorIndex = pieces.indexOf(type) + 1;
-    const offset = { x: 1, y: index * 4 + 1 }; // 少し右に寄せて縦に5個分
+    const offset = { x: 1, y: index * 4 + 1 };
 
     matrix.forEach((row, y) => {
       row.forEach((value, x) => {
@@ -330,7 +330,7 @@ function drawNext() {
   });
 }
 
-// HOLD描画
+
 function drawHold() {
   holdCtx.clearRect(0, 0, holdCanvas.width, holdCanvas.height);
 
@@ -339,7 +339,7 @@ function drawHold() {
   const matrix = createPiece(player.hold);
   const colorIndex = pieces.indexOf(player.hold) + 1;
 
-  // 中央寄せ用オフセット（持ち駒は最大4×4マトリクス想定）
+
   const offsetX = Math.floor((4 - matrix[0].length) / 2);
   const offsetY = Math.floor((4 - matrix.length) / 2);
 
@@ -353,7 +353,7 @@ function drawHold() {
   });
 }
 
-// ホールド機能（Xキー）
+
 function holdPiece() {
   if (!player.canHold) return;
   const currentType = player.type;
@@ -383,34 +383,43 @@ function holdPiece() {
   drawHold();
 }
 
-// Tスピン判定 (簡易版)
-let lastMoveWasRotate = false;
 function checkTSpin() {
-  lastMoveWasRotate = (player.lastMove === 'rotate' && player.type === 'T');
+  if (player.type !== 'T' || player.lastMove !== 'rotate') {
+    lastMoveWasRotate = false;
+    return;
+  }
+
+  const { x, y } = player.pos;
+  const corners = [
+    [x, y],             // 左上
+    [x + 2, y],         // 右上
+    [x, y + 2],         // 左下
+    [x + 2, y + 2],     // 右下
+  ];
+
+  let occupied = 0;
+  for (const [cx, cy] of corners) {
+    if (
+      cy < 0 || cy >= arena.length ||
+      cx < 0 || cx >= arena[0].length ||
+      arena[cy][cx] !== 0
+    ) {
+      occupied++;
+    }
+  }
+
+  lastMoveWasRotate = occupied >= 3;
 }
 
-// タイマー
 let dropCounter = 0;
 let dropInterval = 1000;
 
 let lastTime = 0;
-function update(time = 0) {
-  const deltaTime = time - lastTime;
-  lastTime = time;
-
-  dropCounter += deltaTime;
-  if (dropCounter > dropInterval) {
-    playerDrop();
-  }
-
-  draw();
-  requestAnimationFrame(update);
-}
 function hardDrop() {
   while (!collide(arena, player)) {
     player.pos.y++;
   }
-  player.pos.y--; // 1マス上に戻る（衝突前の位置）
+  player.pos.y--;
   merge(arena, player);
   arenaSweep();
   playerReset();
@@ -421,32 +430,33 @@ function hardDrop() {
 document.addEventListener('keydown', e => {
   if (e.code === 'ArrowLeft') {
     if (!keys.ArrowLeft.pressed) {
-      playerMove(-1); // 即時1マス移動
+      playerMove(-1);
     }
     keys.ArrowLeft.pressed = true;
   } else if (e.code === 'ArrowRight') {
     if (!keys.ArrowRight.pressed) {
-      playerMove(1); // 即時1マス移動
+      playerMove(1);
     }
     keys.ArrowRight.pressed = true;
   } else if (e.code === 'ArrowDown') {
     playerDrop();
   } else if (e.code === 'KeyC') {
     playerRotate(1);
+  } else if (e.code === 'KeyZ') {
+    playerRotate(-1); // ←★ これを追加！
   } else if (e.code === 'KeyX') {
     holdPiece();
   } else if (e.code === 'ArrowUp') {
     hardDrop();
   }
 });
-
 document.addEventListener('keyup', e => {
   if (e.code in keys) {
     keys[e.code].pressed = false;
     keys[e.code].delay = 0;
   }
 });
-// 初期化
+
 createNextQueue();
 initNextQueue();
 playerReset();
@@ -456,8 +466,18 @@ function update(time = 0) {
   const delta = time - lastTime;
   lastTime = time;
   dropCounter += delta;
+  if (isLocking) {
+    lockTimer += delta;
+    if (lockTimer > lockDelay) {
+      merge(arena, player);
+      arenaSweep();
+      playerReset();
+      player.canHold = true;
+      isLocking = false;
+    }
+  }
 
-  // ←→の自動移動処理
+
   for (const key in keys) {
     if (keys[key].pressed) {
       keys[key].delay += delta;
