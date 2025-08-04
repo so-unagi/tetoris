@@ -71,7 +71,7 @@
         <div>
             <canvas id="hold" width="100" height="100"></canvas>
             <div id="scoreboard">
-                スコア：<span id="score">0</span>　
+                スコア：<span id="score">0</span>
                 ハイスコア：<span id="highscore">0</span>
             </div>
         </div>
@@ -135,6 +135,16 @@
         // NEXTキュー 5つ
         const NEXT_COUNT = 5;
         const nextQueue = [];
+        function initNextQueue() {
+            while (nextQueue.length < 5) {
+                nextQueue.push(getNextPieceFromBag());
+            }
+        }
+        function refillNextQueue() {
+            while (nextQueue.length < 5) {
+                nextQueue.push(getNextPieceFromBag());
+            }
+        }
 
         // ハイスコア取得
         let highscore = parseInt(localStorage.getItem('tetrisHigh') || '0');
@@ -334,13 +344,26 @@
 
             player.matrix = originalMatrix; // 回転失敗時に復元
         }
+        let bag = [];
+        function refillBag() {
+            const types = ['T', 'J', 'L', 'O', 'S', 'Z', 'I'];
+            // Fisher–Yates シャッフル
+            for (let i = types.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [types[i], types[j]] = [types[j], types[i]];
+            }
+            bag.push(...types);
+        }
+        function getNextPieceFromBag() {
+            if (bag.length === 0) {
+                refillBag();
+            }
+            return bag.shift();
+        }
 
         function playerReset() {
-            if (nextQueue.length === 0) {
-                createNextQueue();
-            }
-            const pieceType = nextQueue.shift();
-            nextQueue.push(randomPiece());
+            const pieceType = nextQueue.shift();  // 先頭を使う
+            refillNextQueue();                    // 末尾に補充
 
             player.matrix = createPiece(pieceType);
             player.type = pieceType;
@@ -349,14 +372,14 @@
             player.pos.x = Math.floor(arena[0].length / 2) - Math.floor(player.matrix[0].length / 2);
 
             if (collide(arena, player)) {
+                // ゲームオーバー処理
                 arena.forEach(row => row.fill(0));
                 alert('ゲームオーバー');
                 player.score = 0;
                 scoreEl.textContent = 0;
-                createNextQueue();
+                initNextQueue();  // 初期化時も必要
                 playerReset();
             }
-
             drawNext();
             drawHold();
         }
@@ -508,15 +531,13 @@
                 keys[e.code].delay = 0;
             }
         });
-
-
-
-
-
         // 初期化
         createNextQueue();
+        initNextQueue();
         playerReset();
-        update(); function update(time = 0) {
+        update();
+
+        function update(time = 0) {
             const delta = time - lastTime;
             lastTime = time;
             dropCounter += delta;
