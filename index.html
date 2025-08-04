@@ -105,17 +105,18 @@
         holdCtx.scale(20, 20);
 
         const colors = [
-            null,         // 0: 空白
-            '#8000FF',    // 1: T
-            '#FFFF00',    // 2: O
-            '#FFA500',    // 3: L
-            '#0000FF',    // 4: J
-            '#00FFFF',    // 5: I
-            '#00FF00',    // 6: S
-            '#FF0000'     // 7: Z
+            null,            // 0: 空白
+            '#A000F0',       // 1: T (紫)
+            '#F0F000',       // 2: O (黄色)
+            '#F0A000',       // 3: L (オレンジ)
+            '#0000F0',       // 4: J (青)
+            '#00F0F0',       // 5: I (水色)
+            '#00F000',       // 6: S (緑)
+            '#F00000'        // 7: Z (赤)
         ];
 
-        const pieces = 'TJLOSZI';
+
+        const pieces = 'TOLJISZ'; // ピースの種類
 
         // 10列×20行
         const arena = createMatrix(10, 20);
@@ -151,8 +152,8 @@
             if (type === 'L') return [[0, 0, 3], [3, 3, 3]];
             if (type === 'O') return [[2, 2], [2, 2]];
             if (type === 'S') return [[0, 6, 6], [6, 6, 0]];
-            if (type === 'T') return [[0, 7, 0], [7, 7, 7]];
-            if (type === 'Z') return [[1, 1, 0], [0, 1, 1]];
+            if (type === 'T') return [[0, 1, 0], [1, 1, 1]];
+            if (type === 'Z') return [[7, 7, 0], [0, 7, 7]];
         }
 
 
