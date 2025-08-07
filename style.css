@@ -1,0 +1,55 @@
+body {
+    background: #222;
+    color: #fff;
+    font-family: sans-serif;
+    text-align: center;
+}
+
+#container {
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    gap: 20px;
+    margin-top: 20px;
+}
+
+canvas {
+    background: #111;
+    border: 2px solid #444;
+    image-rendering: pixelated;
+}
+
+#tetris {
+    /* 10列×20行 × 20px = 200×400 */
+    width: 200px;
+    height: 400px;
+}
+
+#next {
+    /* 横6セル×20px, 縦(4セル×5個=20セル)×20px = 120×400 */
+    width: 120px;
+    height: 400px;
+    background: #111;
+    border: 2px solid #444;
+}
+
+#hold {
+    width: 100px;
+    height: 100px;
+    background: #111;
+    border: 2px solid #444;
+    margin-bottom: 10px;
+}
+
+#scoreboard {
+    margin: 10px;
+}
+
+.btn {
+    padding: 10px;
+    margin: 5px;
+    background: #444;
+    color: #fff;
+    border-radius: 5px;
+    user-select: none;
+}
